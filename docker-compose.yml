@@ -1,0 +1,52 @@
+version: '3.6'
+
+networks:
+ gitlab_net:
+   driver: bridge
+   ipam:
+      driver: default
+      config:
+      - subnet: 192.168.201.0/24
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    hostname: test1.ru-central1.internal
+    ports:
+    - "80:80"
+    - "443:443"
+    - "9022:22"
+    restart: always
+    volumes:
+    - ./persistence/gitlab/config:/etc/gitlab
+    - ./persistence/gitlab/logs:/var/log/gitlab
+    - ./persistence/gitlab/data:/var/opt/gitlab
+    networks:
+      gitlab_net:
+        ipv4_address: 192.168.201.10
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:alpine
+    depends_on:
+    - gitlab
+    privileged: true
+    networks:
+    - gitlab_net
+    extra_hosts:
+      - "gitlab:192.168.201.10"
+    volumes:
+    - ./persistence/gitlab-runner/config:/etc/gitlab-runner
+    - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+    - CI_SERVER_URL=gitlab/ci
+    - REGISTRATION_TOKEN=${GITLAB_RUNNER_REGISTRATION_TOKEN}
+    - RUNNER_NAME=alpine_docker
+    - RUNNER_EXECUTOR=docker
+    - RUNNER_TAG_LIST=dind,did,alpine,docker
+    - REGISTER_RUN_UNTAGGED=true
+    - DOCKER_IMAGE=alpine:latest
+    # Notice that it matches exactly the network found in docker network ls
+    - DOCKER_NETWORK_MODE=git_gitlab_nett
+    - DOCKER_EXTRA_HOSTS=gilab:192.168.201.10
+    - DOCKER_VOLUMES=/var/run/docker.sock:/var/run/docker.sock
+    - DOCKER_PRIVILEGED=true
+
